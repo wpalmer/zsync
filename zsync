@@ -1,0 +1,80 @@
+#!/bin/bash
+stderr(){ [[ $# -eq 0 ]] && { cat >&2; return; }; printf '%s\n' "$*" | stderr; }
+die(){ [[ $# -eq 0 ]] || stderr "$*"; exit 1; }
+-(){ { printf "%${BASH_SUBSHELL}s%s " '+'; printf '%q ' "$@"; printf '\n'; } | stderr; }
++(){ - "$@"; "$@"; }
+usage(){
+	sed 's/^..//' <<USAGE
+		zsync: Scans up directory tree looking for .zsync file, running rsync from wherever the file is found.
+		Usage: ${BASH_SOURCE[0]} [--help] [--simulate]
+
+		The .zsync file contains arguments to append to the rsync command. This may be simply the name of the
+		remote host to sync to, or it may include additional arguments (such as exclusion rules)
+USAGE
+}
+
+do_simulate=0
+do_forever=0
+args=( "$@" )
+while [ ${#args} -gt 0 ]; do
+	arg="${args[0]}"; args=( "${args[@]:1}" )
+
+	case "$arg" in
+		--simulate|-n)
+			do_simulate=1
+			;;
+		--forever)
+			do_forever=1
+			;;
+		--help)
+			usage
+			exit
+			;;
+		*)
+			stderr "Unknown argument '$arg'"
+			usage | stderr
+			die
+			;;
+	esac
+done
+
+while [ "$(pwd)" != '/' ]; do
+	if [ -f ./.zsync ]; then
+		remote="$(cat ./.zsync)"
+		[[ -n "$remote" ]] || exit 1
+
+		cmd=(
+			rsync -az --progress
+				--exclude=.zsync
+				--exclude=.*.swp
+				--exclude=.*.swo
+				.
+				"$remote"
+		)
+		if [[ $do_forever -eq 1 ]]; then
+			while inotifywait -r \
+				-e modify \
+				-e attrib \
+				-e move \
+				-e delete \
+				--exclude '\.*\.sw[po]$' .
+			do
+				echo detected... >&2
+				"${cmd[@]}" && sleep 1
+			done
+			exit "$?"
+		fi
+
+		if [[ $do_simulate -eq 1 ]]; then
+			- "$PWD:" "${cmd[@]}"
+			exit 0
+		fi
+		
+		"${cmd[@]}"
+		exit "$?"
+	fi
+
+	cd .. || exit 1
+done
+
+die 'No .zsync file found'
