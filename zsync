@@ -38,9 +38,16 @@ while [ ${#args} -gt 0 ]; do
 	esac
 done
 
+dot_zsync_args=()
 while [ "$(pwd)" != '/' ]; do
 	if [ -f ./.zsync ]; then
-		remote="$(cat ./.zsync)"
+		while read line; do
+			if [ -z "$remote" ]; then
+				remote="$line"
+			else
+				dot_zsync_args=( "${dot_zsync_args[@]}" "$line" )
+			fi
+		done < <( sed -e '/^\s*(#.*)?$/d' ./.zsync )
 		[[ -n "$remote" ]] || exit 1
 
 		cmd=(
@@ -48,6 +55,7 @@ while [ "$(pwd)" != '/' ]; do
 				--exclude=.zsync
 				--exclude=.*.swp
 				--exclude=.*.swo
+				"${dot_zsync_args[@]}"
 				.
 				"$remote"
 		)
