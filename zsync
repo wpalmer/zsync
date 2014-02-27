@@ -38,6 +38,13 @@ while [ ${#args} -gt 0 ]; do
 	esac
 done
 
+dotzsyncignore_args=()
+if [ -f "$HOME/.zsyncignore" ]; then
+	while read line; do
+		dotzsyncignore_args=( "${dotzsyncignore_args[@]}" "--exclude=$line" )
+	done < <( sed -e '/^\s*(#.*)?$/d' "$HOME/.zsyncignore" )
+fi
+
 dot_zsync_args=()
 while [ "$(pwd)" != '/' ]; do
 	if [ -f ./.zsync ]; then
@@ -53,8 +60,7 @@ while [ "$(pwd)" != '/' ]; do
 		cmd=(
 			rsync -az --progress
 				--exclude=.zsync
-				--exclude=.*.swp
-				--exclude=.*.swo
+				"${dotzsyncignore_args[@]}"
 				"${dot_zsync_args[@]}"
 				.
 				"$remote"
