@@ -74,6 +74,7 @@ while [ "$(pwd)" != '/' ]; do
 				--exclude '\.*\.sw[po]$' .
 			do
 				echo detected... >&2
+				sleep 0.1
 				"${cmd[@]}" && sleep 1
 			done
 			exit "$?"
